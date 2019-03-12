@@ -154,13 +154,7 @@ struct Environment {
   std::shared_ptr<Environment> outer;
   std::map<std::string, Value> values;
 
-  void append_outer(std::shared_ptr<Environment> outer) {
-    if (this->outer) {
-      this->outer->append_outer(outer);
-    } else {
-      this->outer = outer;
-    }
-  }
+  Environment(std::shared_ptr<Environment> outer = nullptr): outer(outer) {}
 
   const Value& get_value(const std::string& s) const {
     if (values.find(s) != values.end()) {
@@ -217,9 +211,8 @@ Value eval_for(const peg::Ast& ast, std::shared_ptr<Environment> env) {
   auto& expr = *ast.nodes[3];
 
   for (auto i = from; i <= to; i++) {
-    auto call_env = std::make_shared<Environment>();
+    auto call_env = std::make_shared<Environment>(env);
     call_env->set_value(ident, Value(i));
-    call_env->append_outer(env);
     eval(expr, call_env);
   }
 
@@ -287,7 +280,6 @@ int main(int argc, const char** argv) {
   if (!ast) {
     return 3;
   }
-  // cout << peg::ast_to_s(ast) << endl;
 
   try {
     interpret(*ast);
