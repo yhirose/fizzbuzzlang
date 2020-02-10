@@ -19,25 +19,23 @@ bool read_file(const char* path, vector<char>& buf) {
 std::shared_ptr<peg::Ast> parse(const std::vector<char>& source, std::ostream& out) {
   peg::parser parser(R"(
     # Syntax Rules
-    START                   <- _ EXPRESSION _
     EXPRESSION              <- TERNARY
-    TERNARY                 <- CONDITION (_ '?' _ EXPRESSION _ ':' _ EXPRESSION)?
-    CONDITION               <- MULTIPLICATIVE (_ ConditionOperator _ MULTIPLICATIVE)?
-    MULTIPLICATIVE          <- CALL (_ MultiplicativeOperator _ CALL)*
-    CALL                    <- PRIMARY (__ EXPRESSION)?
-    PRIMARY                 <- FOR / Identifier / '(' _ EXPRESSION _ ')' / String / Number
-    FOR                     <- 'for' __ Identifier __ 'from' __ Number __ 'to' __ Number __ EXPRESSION
+    TERNARY                 <- CONDITION ('?' EXPRESSION ':' EXPRESSION)?
+    CONDITION               <- MULTIPLICATIVE (ConditionOperator MULTIPLICATIVE)?
+    MULTIPLICATIVE          <- CALL (MultiplicativeOperator CALL)*
+    CALL                    <- PRIMARY (EXPRESSION)?
+    PRIMARY                 <- FOR / Identifier / '(' EXPRESSION ')' / String / Number
+    FOR                     <- 'for' Identifier 'from' Number 'to' Number EXPRESSION
 
     # Token Rules
     ConditionOperator       <- '=='
     MultiplicativeOperator  <- '%'
-    Identifier              <- !Keyword [a-zA-Z][a-zA-Z0-9_]*
-    String                  <- "'" < (!['] .)* > "'"
-    Number                  <- [0-9]+
-    ~_                      <- Whitespace*
-    ~__                     <- Whitespace+
-    Whitespace              <- [ \t\r\n]
+    Identifier              <- !Keyword < [a-zA-Z][a-zA-Z0-9_]* >
+    String                  <- "'" < ([^'] .)* > "'"
+    Number                  <- < [0-9]+ >
+
     Keyword                 <- 'for' / 'from' / 'to'
+    %whitespace             <- [ \t\r\n]*
   )");
 
   parser.enable_ast();
