@@ -1,6 +1,18 @@
-#include "peglib.h"
+//
+//  FizzBuzzLang
+//  A Programming Language just for writing Fizz Buzz program. :)
+//
+//  Copyright (c) 2020 Yuji Hirose. All rights reserved.
+//  MIT License
+//
+
 #include <fstream>
+
+#include "peglib.h"
+
 using namespace std;
+using namespace peg;
+using namespace peg::udl;
 
 bool read_file(const char* path, vector<char>& buf) {
   ifstream ifs(path, ios::in);
@@ -16,8 +28,8 @@ bool read_file(const char* path, vector<char>& buf) {
 // Parser
 //-----------------------------------------------------------------------------
 
-std::shared_ptr<peg::Ast> parse(const std::vector<char>& source, std::ostream& out) {
-  peg::parser parser(R"(
+shared_ptr<Ast> parse(const vector<char>& source, ostream& out) {
+  parser parser(R"(
     # Syntax Rules
     EXPRESSION              <- TERNARY
     TERNARY                 <- CONDITION ('?' EXPRESSION ':' EXPRESSION)?
@@ -40,13 +52,13 @@ std::shared_ptr<peg::Ast> parse(const std::vector<char>& source, std::ostream& o
 
   parser.enable_ast();
 
-  parser.log = [&](size_t ln, size_t col, const std::string& msg) {
-    out << ln << ":" << col << ": " << msg << std::endl;
+  parser.log = [&](size_t ln, size_t col, const string& msg) {
+    out << ln << ":" << col << ": " << msg << endl;
   };
 
-  std::shared_ptr<peg::Ast> ast;
+  shared_ptr<Ast> ast;
   if (parser.parse_n(source.data(), source.size(), ast)) {
-    return peg::AstOptimizer(true).optimize(ast);
+    return AstOptimizer(true).optimize(ast);
   }
 
   return nullptr;
@@ -57,57 +69,56 @@ std::shared_ptr<peg::Ast> parse(const std::vector<char>& source, std::ostream& o
 //-----------------------------------------------------------------------------
 
 struct Value;
-
-typedef std::function<Value(const Value&)> Function;
+using Function = function<Value(const Value&)>;
 
 struct Value {
   enum class Type { Nil, Bool, Long, String, Function };
   Type type;
-  peg::any v;
+  any v;
 
   // Constructor
   Value() : type(Type::Nil) {}
   explicit Value(bool b) : type(Type::Bool), v(b) {}
   explicit Value(long l) : type(Type::Long), v(l) {}
-  explicit Value(const std::string& s) : type(Type::String), v(s) {}
+  explicit Value(const string& s) : type(Type::String), v(s) {}
   explicit Value(const Function& f) : type(Type::Function), v(f) {}
 
   // Cast value
   bool to_bool() const {
     switch (type) {
       case Type::Bool:
-        return get<bool>();
+        return any_cast<bool>(v);
       case Type::Long:
-        return get<long>() != 0;
+        return any_cast<long>(v) != 0;
       default:
-        throw std::runtime_error("type error.");
+        throw runtime_error("type error.");
     }
   }
 
   long to_long() const {
     switch (type) {
       case Type::Long:
-        return get<long>();
+        return any_cast<long>(v);
       default:
-        throw std::runtime_error("type error.");
+        throw runtime_error("type error.");
     }
   }
 
-  std::string to_string() const {
+  string to_string() const {
     switch (type) {
       case Type::String:
-        return get<std::string>();
+        return any_cast<string>(v);
       default:
-        throw std::runtime_error("type error.");
+        throw runtime_error("type error.");
     }
   }
 
   Function to_function() const {
     switch (type) {
       case Type::Function:
-        return get<Function>();
+        return any_cast<Function>(v);
       default:
-        throw std::runtime_error("type error.");
+        throw runtime_error("type error.");
     }
   }
 
@@ -123,12 +134,12 @@ struct Value {
       case Type::String:
         return to_string() == rhs.to_string();
       default:
-        throw std::logic_error("invalid internal condition.");
+        throw logic_error("invalid internal condition.");
     }
   }
 
   // String representation
-  std::string str() const {
+  string str() const {
     switch (type) {
       case Type::Nil:
         return "nil";
@@ -139,13 +150,8 @@ struct Value {
       case Type::String:
         return to_string();
       default:
-        throw std::logic_error("invalid internal condition.");
+        throw logic_error("invalid internal condition.");
     }
-  }
-
-  // Cast `any` value
-  template <typename T> const T &get() const {
-    return peg::any_cast<T>(v);
   }
 };
 
@@ -154,45 +160,44 @@ struct Value {
 //-----------------------------------------------------------------------------
 
 struct Environment {
-  std::shared_ptr<Environment> outer;
-  std::map<std::string, Value> values;
+  shared_ptr<Environment> outer;
+  map<string, Value> values;
 
-  Environment(std::shared_ptr<Environment> outer = nullptr): outer(outer) {}
+  Environment(shared_ptr<Environment> outer = nullptr) : outer(outer) {}
 
-  const Value& get_value(const std::string& s) const {
+  const Value& get_value(const string& s) const {
     if (values.find(s) != values.end()) {
       return values.at(s);
     } else if (outer) {
       return outer->get_value(s);
     }
-    throw std::runtime_error("undefined variable '" + s + "'...");
+    throw runtime_error("undefined variable '" + s + "'...");
   }
 
-  void set_value(const std::string& s, const Value& val) { values[s] = val; }
+  void set_value(const string& s, const Value& val) { values[s] = val; }
 };
 
 //-----------------------------------------------------------------------------
 // Interpreter
 //-----------------------------------------------------------------------------
 
-Value eval(const peg::Ast& ast, std::shared_ptr<Environment> env);
+Value eval(const Ast& ast, shared_ptr<Environment> env);
 
-Value eval_ternary(const peg::Ast& ast, std::shared_ptr<Environment> env) {
+Value eval_ternary(const Ast& ast, shared_ptr<Environment> env) {
   auto cond = eval(*ast.nodes[0], env).to_bool();
   auto val1 = eval(*ast.nodes[1], env);
   auto val2 = eval(*ast.nodes[2], env);
   return cond ? val1 : val2;
 }
 
-Value eval_condition(const peg::Ast& ast, std::shared_ptr<Environment> env) {
+Value eval_condition(const Ast& ast, shared_ptr<Environment> env) {
   auto lhs = eval(*ast.nodes[0], env);
   auto rhs = eval(*ast.nodes[2], env);
   auto ret = lhs == rhs;
   return Value(ret);
 }
 
-Value eval_multiplicative(const peg::Ast& ast,
-                          std::shared_ptr<Environment> env) {
+Value eval_multiplicative(const Ast& ast, shared_ptr<Environment> env) {
   auto l = eval(*ast.nodes[0], env).to_long();
   for (auto i = 1; i < ast.nodes.size(); i += 2) {
     auto r = eval(*ast.nodes[i + 1], env).to_long();
@@ -201,20 +206,20 @@ Value eval_multiplicative(const peg::Ast& ast,
   return Value(l);
 }
 
-Value eval_call(const peg::Ast& ast, std::shared_ptr<Environment> env) {
+Value eval_call(const Ast& ast, shared_ptr<Environment> env) {
   auto fn = env->get_value(ast.nodes[0]->token).to_function();
   auto val = eval(*ast.nodes[1], env);
   return fn(val);
 }
 
-Value eval_for(const peg::Ast& ast, std::shared_ptr<Environment> env) {
+Value eval_for(const Ast& ast, shared_ptr<Environment> env) {
   auto ident = ast.nodes[0]->token;
   auto from = eval(*ast.nodes[1], env).to_long();
   auto to = eval(*ast.nodes[2], env).to_long();
   auto& expr = *ast.nodes[3];
 
   for (auto i = from; i <= to; i++) {
-    auto call_env = std::make_shared<Environment>(env);
+    auto call_env = make_shared<Environment>(env);
     call_env->set_value(ident, Value(i));
     eval(expr, call_env);
   }
@@ -222,9 +227,7 @@ Value eval_for(const peg::Ast& ast, std::shared_ptr<Environment> env) {
   return Value();
 }
 
-Value eval(const peg::Ast& ast, std::shared_ptr<Environment> env) {
-  using namespace peg::udl;
-
+Value eval(const Ast& ast, shared_ptr<Environment> env) {
   switch (ast.tag) {
     // Rules
     case "TERNARY"_:
@@ -251,12 +254,12 @@ Value eval(const peg::Ast& ast, std::shared_ptr<Environment> env) {
 }
 
 Function putsFn = [](const Value& val) -> Value {
-  std::cout << val.str() << std::endl;
+  cout << val.str() << endl;
   return Value();
 };
 
-Value interpret(const peg::Ast& ast) {
-  auto env = std::make_shared<Environment>();
+Value interpret(const Ast& ast) {
+  auto env = make_shared<Environment>();
   env->set_value("puts", Value(putsFn));
   return eval(ast, env);
 }
