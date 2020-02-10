@@ -78,9 +78,9 @@ struct Value {
   bool to_bool() const {
     switch (type) {
       case Type::Bool:
-        return v.get<bool>();
+        return get<bool>();
       case Type::Long:
-        return v.get<long>() != 0;
+        return get<long>() != 0;
       default:
         throw std::runtime_error("type error.");
     }
@@ -89,7 +89,7 @@ struct Value {
   long to_long() const {
     switch (type) {
       case Type::Long:
-        return v.get<long>();
+        return get<long>();
       default:
         throw std::runtime_error("type error.");
     }
@@ -98,7 +98,7 @@ struct Value {
   std::string to_string() const {
     switch (type) {
       case Type::String:
-        return v.get<std::string>();
+        return get<std::string>();
       default:
         throw std::runtime_error("type error.");
     }
@@ -107,7 +107,7 @@ struct Value {
   Function to_function() const {
     switch (type) {
       case Type::Function:
-        return v.get<Function>();
+        return get<Function>();
       default:
         throw std::runtime_error("type error.");
     }
@@ -143,6 +143,11 @@ struct Value {
       default:
         throw std::logic_error("invalid internal condition.");
     }
+  }
+
+  // Cast `any` value
+  template <typename T> const T &get() const {
+    return peg::any_cast<T>(v);
   }
 };
 
