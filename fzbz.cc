@@ -80,8 +80,8 @@ struct Value {
   Value() : type(Type::Nil) {}
   explicit Value(bool b) : type(Type::Bool), v(b) {}
   explicit Value(long l) : type(Type::Long), v(l) {}
-  explicit Value(const string& s) : type(Type::String), v(s) {}
-  explicit Value(const Function& f) : type(Type::Function), v(f) {}
+  explicit Value(string_view s) : type(Type::String), v(s) {}
+  explicit Value(Function f) : type(Type::Function), v(std::move(f)) {}
 
   // Cast value
   bool to_bool() const {
@@ -104,10 +104,10 @@ struct Value {
     }
   }
 
-  string to_string() const {
+  string_view to_string_view() const {
     switch (type) {
       case Type::String:
-        return any_cast<string>(v);
+        return any_cast<string_view>(v);
       default:
         throw runtime_error("type error.");
     }
@@ -132,7 +132,7 @@ struct Value {
       case Type::Long:
         return to_long() == rhs.to_long();
       case Type::String:
-        return to_string() == rhs.to_string();
+        return to_string_view() == rhs.to_string_view();
       default:
         throw logic_error("invalid internal condition.");
     }
@@ -148,7 +148,7 @@ struct Value {
       case Type::Long:
         return std::to_string(to_long());
       case Type::String:
-        return to_string();
+        return string(to_string_view());
       default:
         throw logic_error("invalid internal condition.");
     }
@@ -161,20 +161,20 @@ struct Value {
 
 struct Environment {
   shared_ptr<Environment> outer;
-  map<string, Value> values;
+  map<string_view, Value> values;
 
   Environment(shared_ptr<Environment> outer = nullptr) : outer(outer) {}
 
-  const Value& get_value(const string& s) const {
+  const Value& get_value(string_view s) const {
     if (values.find(s) != values.end()) {
       return values.at(s);
     } else if (outer) {
       return outer->get_value(s);
     }
-    throw runtime_error("undefined variable '" + s + "'...");
+    throw runtime_error("undefined variable '" + string(s) + "'...");
   }
 
-  void set_value(const string& s, const Value& val) { values[s] = val; }
+  void set_value(string_view s, const Value& val) { values[s] = val; }
 };
 
 //-----------------------------------------------------------------------------
@@ -247,20 +247,20 @@ Value eval(const Ast& ast, shared_ptr<Environment> env) {
     case "String"_:
       return Value(ast.token);
     case "Number"_:
-      return Value(stol(ast.token));
+      return Value(ast.token_to_number<long>());
   }
 
   return Value();
 }
 
-Function putsFn = [](const Value& val) -> Value {
-  cout << val.str() << endl;
-  return Value();
-};
-
 Value interpret(const Ast& ast) {
   auto env = make_shared<Environment>();
-  env->set_value("puts", Value(putsFn));
+
+  env->set_value("puts", Value(Function([](auto& val) {
+                   cout << val.str() << endl;
+                   return Value();
+                 })));
+
   return eval(ast, env);
 }
 
