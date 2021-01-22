@@ -46,7 +46,7 @@ shared_ptr<Ast> parse(const vector<char>& source, ostream& out) {
     String                  <- "'" < ([^'] .)* > "'"
     Number                  <- < [0-9]+ >
 
-    Keyword                 <- 'for' / 'from' / 'to'
+    Keyword                 <- ('for' / 'from' / 'to') ![a-zA-Z]
     %whitespace             <- [ \t\r\n]*
   )");
 
