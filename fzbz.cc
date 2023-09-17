@@ -43,9 +43,9 @@ shared_ptr<Ast> parse(const string& source, ostream& out) {
 
   parser.enable_ast();
 
-  parser.log = [&](size_t ln, size_t col, const auto& msg) {
+  parser.set_logger([&](size_t ln, size_t col, const auto& msg) {
     out << ln << ":" << col << ": " << msg << endl;
-  };
+  });
 
   shared_ptr<Ast> ast;
   if (parser.parse_n(source.data(), source.size(), ast)) {
