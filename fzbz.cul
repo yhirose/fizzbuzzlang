@@ -1,0 +1,136 @@
+#
+#  FizzBuzzLang
+#  A Programming Language just for writing Fizz Buzz program. :)
+#
+#  Copyright (c) 2026 Yuji Hirose. All rights reserved. MIT License
+#  MIT License
+#
+
+#-----------------------------------------------------------------------------
+# Parser
+#-----------------------------------------------------------------------------
+
+let grammar = `
+  EXPRESSION              <- TERNARY
+  TERNARY                 <- CONDITION ('?' EXPRESSION ':' EXPRESSION)?
+  CONDITION               <- MULTIPLICATIVE (ConditionOperator MULTIPLICATIVE)?
+  MULTIPLICATIVE          <- CALL (MultiplicativeOperator CALL)*
+  CALL                    <- PRIMARY (EXPRESSION)?
+  PRIMARY                 <- FOR / Identifier / '(' EXPRESSION ')' / String / Number
+  FOR                     <- 'for' Identifier 'from' Number 'to' Number EXPRESSION
+
+  ConditionOperator       <- '=='
+  MultiplicativeOperator  <- '%'
+  Identifier              <- !Keyword < [a-zA-Z][a-zA-Z0-9_]* >
+  String                  <- "'" < ([^'] .)* > "'"
+  Number                  <- < [0-9]+ >
+
+  Keyword                 <- ('for' / 'from' / 'to') ![a-zA-Z]
+  %whitespace             <- [ \t\r\n]*
+`
+
+fn fail(node, msg) {
+  throw {kind: 'FizzBuzzError', message: msg, line: node.line, col: node.column}
+}
+
+#-----------------------------------------------------------------------------
+# Environment
+#-----------------------------------------------------------------------------
+
+class Environment {
+  new(outer = nil) {
+    self.outer = outer
+    self.values = {}
+  }
+
+  get_value(name, at) {
+    cond {
+      self.values.has(name) => self.values[name],
+      self.outer != nil => self.outer.get_value(name, at),
+      _ => fail(at, "undefined variable '{name}'..."),
+    }
+  }
+
+  set_value(name, value) {
+    self.values[name] = value
+  }
+}
+
+#-----------------------------------------------------------------------------
+# Interpreter
+#-----------------------------------------------------------------------------
+
+fn eval(n, env) {
+  match n {
+    {name: 'TERNARY', nodes: [cond, then_expr, else_expr]} =>
+      eval(cond, env) ? eval(then_expr, env) : eval(else_expr, env),
+    {name: 'CONDITION', nodes: [lhs, op, rhs]} => eval(lhs, env) == eval(rhs, env),
+    {name: 'MULTIPLICATIVE', nodes} => multiplicative(nodes, env),
+    {name: 'CALL', nodes: [primary, arg]} => call(primary, arg, env),
+    {name: 'FOR', nodes: [ident, from, to, body]} => exec_for(ident, from, to, body, env),
+    {name: 'Identifier', token} => env.get_value(token, n),
+    {name: 'String', token} => token,
+    {name: 'Number', token} => to_long(token),
+    _ => fail(n, "cannot evaluate {n.name}"),
+  }
+}
+
+# MULTIPLICATIVE <- CALL (MultiplicativeOperator CALL)*
+fn multiplicative(nodes, env) {
+  let [head, ...rest] = nodes
+  mut value = eval(head, env)
+  for [op, operand] in rest.iter().chunks(2) {
+    value %= eval(operand, env)
+  }
+  value
+}
+
+# CALL <- PRIMARY (EXPRESSION)?
+fn call(primary, arg_node, env) {
+  let fn_val = env.get_value(primary.token, primary)
+  let arg = eval(arg_node, env)
+  fn_val(arg)
+}
+
+# FOR <- 'for' Identifier 'from' Number 'to' Number EXPRESSION
+fn exec_for(ident, from_node, to_node, body, env) {
+  let from = eval(from_node, env)
+  let to = eval(to_node, env)
+  for i in from..=to {
+    let call_env = Environment.new(env)
+    call_env.set_value(ident.token, i)
+    eval(body, call_env)
+  }
+}
+
+#-----------------------------------------------------------------------------
+# main
+#-----------------------------------------------------------------------------
+
+fn make_global_env() {
+  let env = Environment.new()
+  env.set_value('puts', fn (arg) {
+    println(arg)
+  })
+  env
+}
+
+let args = Sys.argv
+if args.empty() {
+  println('usage: culebra fzbz.cul [source file path]')
+  Sys.exit(1)
+}
+
+try {
+  let path = args[0]
+  let source = FS.read(path)
+  let tree = Peg.parse(grammar, source, path: path)
+  eval(tree, make_global_env())
+} catch e {
+  match e {
+    {kind: 'FizzBuzzError'} => println("{args[0]}:{e.line}:{e.col}: {e.message}"),
+    {kind: 'PegError'} => println(e.message),
+    _ => throw e,
+  }
+  Sys.exit(1)
+}
