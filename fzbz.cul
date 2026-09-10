@@ -124,7 +124,7 @@ if args.empty() {
 try {
   let path = args[0]
   let source = FS.read(path)
-  let tree = Peg.parse(grammar, source, path: path)
+  let tree = PEG.parse(grammar, source, path: path)
   eval(tree, make_global_env())
 } catch e {
   match e {
