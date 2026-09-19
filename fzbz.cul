@@ -62,12 +62,20 @@ class Environment {
 
 fn eval(n, env) {
   match n {
-    {name: 'TERNARY', nodes: [cond, then_expr, else_expr]} =>
-      eval(cond, env) ? eval(then_expr, env) : eval(else_expr, env),
-    {name: 'CONDITION', nodes: [lhs, op, rhs]} => eval(lhs, env) == eval(rhs, env),
+    {
+      name: 'TERNARY',
+      nodes: [cond, then_expr, else_expr],
+    } => eval(cond, env) ? eval(then_expr, env) : eval(else_expr, env),
+    {
+      name: 'CONDITION',
+      nodes: [lhs, op, rhs],
+    } => eval(lhs, env) == eval(rhs, env),
     {name: 'MULTIPLICATIVE', nodes} => multiplicative(nodes, env),
     {name: 'CALL', nodes: [primary, arg]} => call(primary, arg, env),
-    {name: 'FOR', nodes: [ident, from, to, body]} => exec_for(ident, from, to, body, env),
+    {
+      name: 'FOR',
+      nodes: [ident, from, to, body],
+    } => exec_for(ident, from, to, body, env),
     {name: 'Identifier', token} => env.get_value(token, n),
     {name: 'String', token} => token,
     {name: 'Number', token} => to_long(token),
@@ -117,19 +125,21 @@ fn make_global_env() {
 
 let args = Sys.argv
 if args.empty() {
-  println('usage: culebra fzbz.cul [source file path]')
+  IO.eprintln('usage: culebra fzbz.cul [source file path]')
   Sys.exit(1)
 }
 
+let path = args[0]
+
 try {
-  let path = args[0]
   let source = FS.read(path)
   let tree = PEG.parse(grammar, source, path: path)
   eval(tree, make_global_env())
 } catch e {
   match e {
-    {kind: 'FizzBuzzError'} => println("{args[0]}:{e.line}:{e.col}: {e.message}"),
-    {kind: 'PegError'} => println(e.message),
+    {kind: 'FizzBuzzError'} => IO.eprintln("{path}:{e.line}:{e.col}: {e.message}"),
+    {kind: 'PEGError'} => IO.eprintln(e.message),
+    {kind: 'IOError'} => IO.eprintln("can't open the source file."),
     _ => throw e,
   }
   Sys.exit(1)
