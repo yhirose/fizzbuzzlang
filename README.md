@@ -39,10 +39,10 @@ FOR                     <- 'for' Identifier 'from' Number 'to' Number EXPRESSION
 ConditionOperator       <- '=='
 MultiplicativeOperator  <- '%'
 Identifier              <- !Keyword < [a-zA-Z][a-zA-Z0-9_]* >
-String                  <- "'" < ([^'] .)* > "'"
+String                  <- "'" < (!"'" .)* > "'"
 Number                  <- < [0-9]+ >
 
-Keyword                 <- 'for' / 'from' / 'to'
+Keyword                 <- ('for' / 'from' / 'to') ![a-zA-Z]
 %whitespace             <- [ \t\r\n]*
 ```
 
